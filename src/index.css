@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-background text-text font-sans;
+  overflow-x: hidden; /* Prevent horizontal scroll from particle effects */
+}
+
+/* Custom scrollbar for a sleek look */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #E0E0E0; /* Border color for track */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D32F2F; /* Primary red for thumb */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C62828; /* Darker red on hover */
+}
+
+/* Custom styles for input focus */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.3); /* primary color glow */
+  border-color: #D32F2F;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-gradient-to-r from-primary to-error text-white font-semibold py-3 px-8 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-glow-primary focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-50;
+}
+
+.btn-secondary {
+  @apply bg-surface text-primary font-semibold py-3 px-8 rounded-full border border-border transition-all duration-300 ease-in-out transform hover:scale-105 hover:border-primary hover:text-primary focus:outline-none focus:ring-4 focus:ring-primary focus:ring-opacity-50;
+}
+
+.btn-icon {
+  @apply p-2 rounded-full bg-surface hover:bg-primary/20 transition-colors duration-200 text-text; /* Adjusted for light background */
+}
+
+/* Card styles */
+.card {
+  @apply bg-surface rounded-3xl p-6 shadow-xl border border-border transition-all duration-300 ease-in-out hover:border-primary/50;
+}
+
+/* Table styles */
+.table-container {
+  @apply bg-surface rounded-3xl shadow-xl border border-border overflow-hidden;
+}
+
+.table-header th {
+  @apply px-6 py-4 text-left text-textSecondary uppercase tracking-wider text-sm font-semibold bg-surface/50 border-b border-border;
+}
+
+.table-row td {
+  @apply px-6 py-4 whitespace-nowrap text-text border-b border-border/50;
+}
+
+.table-row:last-child td {
+  @apply border-b-0;
+}
+
+.table-row:hover {
+  @apply bg-surface/70;
+}
+
+/* Input field styles */
+.input-field {
+  @apply w-full p-3 bg-surface border border-border rounded-xl text-text placeholder-textSecondary focus:border-primary focus:ring-primary transition-all duration-200;
+}
+
+/* Custom animations */
+.animate-slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.5s ease-out forwards;
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
