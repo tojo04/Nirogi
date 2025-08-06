@@ -1,55 +1,31 @@
-import React, { useState } from 'react';
-// Using Tailwind CSS animations as defined in tailwind.config.js
-
-// Mock Data for demonstration
-const mockMedications = [
-  { id: 'med1', name: 'Amoxicillin 500mg', generic: true, dosage: '500mg', quantity: 30 },
-  { id: 'med2', name: 'Lisinopril 10mg', generic: true, dosage: '10mg', quantity: 90 },
-  { id: 'med3', name: 'Atorvastatin 20mg', generic: true, dosage: '20mg', quantity: 30 },
-  { id: 'med4', name: 'Metformin 500mg ER', generic: true, dosage: '500mg', quantity: 60 },
-  { id: 'med5', name: 'Ventolin HFA Inhaler', generic: false, dosage: '90mcg/puff', quantity: 1 },
-];
-
-const mockPharmacies = [
-  { id: 'ph1', name: 'Local Pharmacy A', address: '123 Main St', distance: '2.5 mi', rating: 4.8 },
-  { id: 'ph2', name: 'Chain Pharmacy B', address: '456 Oak Ave', distance: '0.8 mi', rating: 4.2 },
-  { id: 'ph3', name: 'Discount Pharmacy C', address: '789 Pine Ln', distance: '5.1 mi', rating: 4.5 },
-  { id: 'ph4', name: 'Online Pharmacy D', address: 'Web-based', distance: 'N/A', rating: 4.9 },
-];
-
-const generateMockResults = (medicationName) => {
-  const results = [];
-  const basePrice = Math.random() * 100 + 20; // Base price between $20 and $120
-
-  mockPharmacies.forEach(pharmacy => {
-    const priceVariation = (Math.random() - 0.5) * 0.3; // +/- 15%
-    const finalPrice = (basePrice * (1 + priceVariation)).toFixed(2);
-    const savings = (basePrice - parseFloat(finalPrice)).toFixed(2);
-    const discountApplied = Math.random() > 0.6 ? 'GoodRx' : 'None'; // Simulate discount
-    const insuranceApplied = Math.random() > 0.7 ? 'BlueCross' : 'None'; // Simulate insurance
-
-    results.push({
-      pharmacy: pharmacy.name,
-      address: pharmacy.address,
-      distance: pharmacy.distance,
-      price: parseFloat(finalPrice),
-      savings: parseFloat(savings),
-      discount: discountApplied,
-      insurance: insuranceApplied,
-      rating: pharmacy.rating,
-    });
-  });
-
-  // Sort by price for better comparison
-  return results.sort((a, b) => a.price - b.price);
-};
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { medicationsAPI, comparisonsAPI } from '../services/api';
 
 const ComparePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [medications, setMedications] = useState([]);
   const [selectedMedication, setSelectedMedication] = useState(null);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [quantity, setQuantity] = useState(30);
+  const [location, setLocation] = useState('');
+  const { isAuthenticated } = useAuth();
+
+  // Load popular medications on component mount
+  useEffect(() => {
+    loadPopularMedications();
+  }, []);
+
+  const loadPopularMedications = async () => {
+    try {
+      const response = await medicationsAPI.getPopular();
+      setMedications(response.data.data);
+    } catch (error) {
+      console.error('Error loading popular medications:', error);
+    }
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -65,20 +41,66 @@ const ComparePage = () => {
     setResults([]);
     setSelectedMedication(null);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const foundMed = mockMedications.find(med =>
-      med.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    if (foundMed) {
-      setSelectedMedication(foundMed);
-      setResults(generateMockResults(foundMed.name));
-    } else {
-      setError(`No results found for "${searchQuery}". Please try another medication.`);
+    try {
+      const response = await medicationsAPI.search(searchQuery, 10);
+      setMedications(response.data.data);
+    } catch (error) {
+      setError('Error searching medications. Please try again.');
+      console.error('Search error:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleMedicationSelect = async (medication) => {
+    if (!isAuthenticated) {
+      setError('Please log in to compare prices.');
+      return;
+    }
+
+    setSelectedMedication(medication);
+    setLoading(true);
+    setError(null);
+    setResults([]);
+
+    try {
+      // For demo purposes, using a default location
+      // In a real app, you'd get user's location or allow them to input it
+      const comparisonData = {
+        medicationId: medication._id,
+        dosage: medication.dosage,
+        quantity: quantity,
+        location: {
+          zipCode: location || '10001',
+          coordinates: [-73.935242, 40.730610] // Default NYC coordinates
+        },
+        filters: {
+          maxDistance: 10,
+          pharmacyType: ['chain', 'independent']
+        }
+      };
+
+      const response = await comparisonsAPI.compare(comparisonData);
+      setResults(response.data.data.results || []);
+    } catch (error) {
+      setError('Error comparing prices. Please try again.');
+      console.error('Comparison error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveComparison = async () => {
+    if (!selectedMedication) return;
+
+    try {
+      // This would save the current comparison
+      // For now, we'll just show a success message
+      alert('Comparison saved successfully!');
+    } catch (error) {
+      setError('Error saving comparison.');
+      console.error('Save error:', error);
+    }
   };
 
   return (
@@ -98,129 +120,162 @@ const ComparePage = () => {
               className="input-field flex-grow"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={loading}
             />
-            <button type="submit" className="btn-primary flex-shrink-0">
-              Search & Compare
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Searching...' : 'Search'}
             </button>
           </form>
+
           {error && (
-            <p className="text-error mt-4 text-center animate-fade-in">{error}</p>
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded">
+              {error}
+            </div>
           )}
         </div>
 
-        {/* Filters and Results */}
-        {loading && (
-          <div className="text-center py-10 animate-fade-in">
-            <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16 mb-4 mx-auto" style={{ borderTopColor: 'var(--primary)' }}></div>
-            <p className="text-textSecondary text-lg">Searching for the best prices...</p>
+        {/* Medication Results */}
+        {medications.length > 0 && (
+          <div className="card p-8 mb-12 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+            <h2 className="text-2xl font-semibold text-text mb-6">Available Medications</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {medications.map((medication) => (
+                <div
+                  key={medication._id}
+                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-primary"
+                  onClick={() => handleMedicationSelect(medication)}
+                >
+                  <h3 className="text-lg font-semibold text-text mb-2">
+                    {medication.name}
+                  </h3>
+                  <p className="text-gray-600 mb-2">
+                    {medication.genericName} {medication.dosage.strength}{medication.dosage.unit}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      medication.isGeneric 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {medication.isGeneric ? 'Generic' : 'Brand'}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {medication.drugClass}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {!loading && selectedMedication && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Filters Panel */}
-            <div className="lg:col-span-1 card p-6 animate-slide-in-left" style={{ animationDelay: '0.4s' }}>
-              <h2 className="text-2xl font-semibold text-text mb-6">Refine Your Search</h2>
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="dosage" className="block text-textSecondary text-sm font-medium mb-2">Dosage</label>
-                  <select id="dosage" className="input-field">
-                    <option>500mg</option>
-                    <option>250mg</option>
-                    <option>100mg</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="quantity" className="block text-textSecondary text-sm font-medium mb-2">Quantity</label>
-                  <select id="quantity" className="input-field">
-                    <option>30</option>
-                    <option>60</option>
-                    <option>90</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="location" className="block text-textSecondary text-sm font-medium mb-2">Location</label>
-                  <input type="text" id="location" placeholder="Your Zip Code" className="input-field" />
-                </div>
-                <div>
-                  <label htmlFor="pharmacyType" className="block text-textSecondary text-sm font-medium mb-2">Pharmacy Type</label>
-                  <select id="pharmacyType" className="input-field">
-                    <option>All</option>
-                    <option>Chain Pharmacies</option>
-                    <option>Independent Pharmacies</option>
-                    <option>Online Pharmacies</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="insurance" className="block text-textSecondary text-sm font-medium mb-2">Insurance Provider</label>
-                  <input type="text" id="insurance" placeholder="e.g., BlueCross, Aetna" className="input-field" />
-                </div>
-                <div>
-                  <label htmlFor="discount" className="block text-textSecondary text-sm font-medium mb-2">Discount Program</label>
-                  <select id="discount" className="input-field">
-                    <option>None</option>
-                    <option>GoodRx</option>
-                    <option>SingleCare</option>
-                    <option>RxSaver</option>
-                  </select>
-                </div>
+        {/* Comparison Settings */}
+        {selectedMedication && (
+          <div className="card p-8 mb-12 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+            <h2 className="text-2xl font-semibold text-text mb-6">Comparison Settings</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value))}
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location (ZIP Code)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., 10001"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => handleMedicationSelect(selectedMedication)}
+                  className="btn-primary w-full"
+                  disabled={loading}
+                >
+                  {loading ? 'Comparing...' : 'Compare Prices'}
+                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Results Table */}
-            <div className="lg:col-span-3 table-container animate-slide-in-right" style={{ animationDelay: '0.6s' }}>
-              <h2 className="text-2xl font-semibold text-text p-6 border-b border-border">
-                Results for <span className="text-primary">{selectedMedication.name}</span>
+        {/* Price Comparison Results */}
+        {results.length > 0 && (
+          <div className="card p-8 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-text">
+                Price Comparison Results
               </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border">
-                  <thead className="table-header">
-                    <tr>
-                      <th scope="col">Pharmacy</th>
-                      <th scope="col">Address / Distance</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Savings</th>
-                      <th scope="col">Discount/Insurance</th>
-                      <th scope="col">Rating</th>
-                      <th scope="col">Action</th>
+              <button
+                onClick={handleSaveComparison}
+                className="btn-secondary"
+              >
+                Save Comparison
+              </button>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-text">Pharmacy</th>
+                    <th className="text-left py-3 px-4 font-semibold text-text">Address</th>
+                    <th className="text-left py-3 px-4 font-semibold text-text">Distance</th>
+                    <th className="text-left py-3 px-4 font-semibold text-text">Price</th>
+                    <th className="text-left py-3 px-4 font-semibold text-text">Savings</th>
+                    <th className="text-left py-3 px-4 font-semibold text-text">Rating</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((result, index) => (
+                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium text-text">
+                        {result.pharmacy}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {result.address}
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {result.distance}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-text">
+                        ${result.price}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          result.savings > 0 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {result.savings > 0 ? `$${result.savings}` : 'N/A'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center">
+                          <span className="text-yellow-400 mr-1">★</span>
+                          <span className="text-sm text-gray-600">{result.rating}</span>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {results.length > 0 ? (
-                      results.map((result, index) => (
-                        <tr key={index} className="table-row">
-                          <td className="font-medium text-primary">{result.pharmacy}</td>
-                          <td>{result.address} <span className="text-textSecondary text-sm">({result.distance})</span></td>
-                          <td className="text-lg font-bold text-success">${result.price.toFixed(2)}</td>
-                          <td className={`${result.savings > 0 ? 'text-success' : 'text-textSecondary'}`}>
-                            {result.savings > 0 ? `$${result.savings.toFixed(2)}` : 'N/A'}
-                          </td>
-                          <td>
-                            {result.discount !== 'None' && <span className="bg-accent/20 text-primary text-xs font-semibold px-2.5 py-0.5 rounded-full mr-2">{result.discount}</span>}
-                            {result.insurance !== 'None' && <span className="bg-primary/20 text-primary text-xs font-semibold px-2.5 py-0.5 rounded-full">{result.insurance}</span>}
-                            {result.discount === 'None' && result.insurance === 'None' && <span className="text-textSecondary text-xs">None</span>}
-                          </td>
-                          <td>
-                            <span className="flex items-center text-warning">
-                              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.683-1.539 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.565-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.92 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"></path></svg>
-                              {result.rating.toFixed(1)}
-                            </span>
-                          </td>
-                          <td>
-                            <button className="btn-secondary text-sm px-4 py-2">View Details</button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="text-center py-8 text-textSecondary">
-                          No comparison results available. Try searching for a medication!
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
