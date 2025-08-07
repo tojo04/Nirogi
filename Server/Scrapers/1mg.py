@@ -23,7 +23,7 @@ def get_1mg_product_link_from_search(page, query):
     return None
 
 def scrape_1mg_product(link):
-    from playwright.sync_api import sync_playwright
+    # from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
