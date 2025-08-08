@@ -4,11 +4,23 @@ const Medicine = require('../models/Medicine');
 exports.searchMedicines = async (req, res, next) => {
   try {
     const { q = '', limit = 10 } = req.query;
-    const query = q
-      ? { name: { $regex: q, $options: 'i' } }
-      : {};
+    let mongoQuery = {};
+    if (q && q.trim().length > 0) {
+      const raw = q.trim();
+      // Make the search tolerant to spaces/hyphens and number-unit spacing (e.g., 500mg vs 500 mg)
+      let pattern = raw
+        .replace(/\s+/g, '[\\s-]*')
+        .replace(/(\d)([a-zA-Z])/g, '$1[\\s-]*$2')
+        .replace(/([a-zA-Z])(\d)/g, '$1[\\s-]*$2');
+      try {
+        const regex = new RegExp(pattern, 'i');
+        mongoQuery = { name: { $regex: regex } };
+      } catch (_) {
+        mongoQuery = { name: { $regex: raw, $options: 'i' } };
+      }
+    }
 
-    const medicines = await Medicine.find(query).limit(Number(limit));
+    const medicines = await Medicine.find(mongoQuery).limit(Number(limit));
     res.json({ data: medicines });
   } catch (err) {
     next(err);

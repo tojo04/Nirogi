@@ -4,36 +4,29 @@ import sys
 import requests
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
-from serpapi import GoogleSearch
-
-SERPAPI_KEY = os.environ.get("SERPAPI_KEY")
 
 def get_pharmeasy_link(query):
-    if not SERPAPI_KEY:
-        print(json.dumps({"error": "SERPAPI_KEY not set"}))
-        sys.exit(1)
-    params = {
-        "engine": "google",
-        "q": f"{query} site:pharmeasy.in",
-        "api_key": SERPAPI_KEY
-    }
-
-    search = GoogleSearch(params)
-    results = search.get_dict()
-    data = results.get("organic_results", [])
-
-    for result in data:
-        link = result.get("link", "").strip()
-        print(f"🔗 Found: {link}", file=sys.stderr)
-        if "pharmeasy.in/online-medicine-order/" in link:
-            print(f"✅ Using link: {link}", file=sys.stderr)
-            return link
-
-    print("❌ No valid PharmEasy link found.", file=sys.stderr)
-    return None
+    # Prefer direct on-site search to avoid SerpAPI dependency differences
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        search_url = f"https://pharmeasy.in/search/all?name={quote(query)}"
+        page.goto(search_url, timeout=60000)
+        page.wait_for_timeout(5000)
+        try:
+            el = page.query_selector("a[href*='/online-medicine-order/']")
+            if el:
+                href = el.get_attribute("href")
+                link = href if href.startswith("http") else f"https://pharmeasy.in{href}"
+                print(f"✅ PharmEasy link: {link}", file=sys.stderr)
+                browser.close()
+                return link
+        except Exception as e:
+            print(f"❌ PharmEasy search error: {e}", file=sys.stderr)
+        browser.close()
+        print("❌ No valid PharmEasy link found.", file=sys.stderr)
+        return None
 def scrape_pharmeasy_product(link):
-    from playwright.sync_api import sync_playwright
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -48,24 +41,40 @@ def scrape_pharmeasy_product(link):
             name = None
 
         # Price (discounted)
+        import re
+        price = None
         try:
-            price_el = page.query_selector("span.PriceInfo_unitPriceDecimal__i3Shz")
-            price = float(price_el.inner_text().replace("₹", "").strip()) if price_el else None
+            price_el = page.query_selector("span.PriceInfo_unitPriceDecimal__i3Shz") or page.query_selector("span[class*='PriceInfo']")
+            if price_el:
+                txt = price_el.inner_text()
+                m = re.search(r"₹\s*([0-9,]+(?:\.[0-9]+)?)", txt)
+                if m:
+                    price = float(m.group(1).replace(',', ''))
         except:
-            price = None
+            pass
 
         # MRP (original)
+        mrp = None
         try:
-            mrp_el = page.query_selector("span.PriceInfo_striked__fmcJv")
-            mrp = float(mrp_el.inner_text().replace("₹", "").strip()) if mrp_el else None
+            mrp_el = page.query_selector("span.PriceInfo_striked__fmcJv") or page.query_selector("span[class*='PriceInfo']")
+            if mrp_el:
+                txt = mrp_el.inner_text()
+                m = re.search(r"₹\s*([0-9,]+(?:\.[0-9]+)?)", txt)
+                if m:
+                    mrp = float(m.group(1).replace(',', ''))
         except:
-            mrp = None
+            pass
 
         # Discount %
         try:
+            discount = 0.0
             discount_el = page.query_selector("div.PriceInfo_gcdDiscountPercent__FvJsG")
-            discount_text = discount_el.inner_text().replace("% OFF", "").strip() if discount_el else "0"
-            discount = float(discount_text)
+            if discount_el:
+                discount_text = discount_el.inner_text().replace("% OFF", "").strip()
+                if discount_text:
+                    discount = float(discount_text)
+            elif price and mrp and mrp > 0 and mrp >= price:
+                discount = round((1 - (price / mrp)) * 100, 2)
         except:
             discount = 0.0
 
