@@ -1,13 +1,10 @@
 const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
 
-// Create express application
+const routes = require('./routes');
+
 const app = express();
 
-// Global middleware
-app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
+app.use('/api/v1', routes);
 
 module.exports = app;
