@@ -1,4 +1,5 @@
-import pandas as pd
+import json
+import sys
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
@@ -80,18 +81,12 @@ def scrape_1mg_product(link):
 
         browser.close()
 
-        print("✅ Extracted:")
-        print(f"Name: {name}")
-        print(f"Price: ₹{price}")
-        print(f"MRP: ₹{mrp}")
-        print(f"Discount: {discount}%")
-
         return {
             "pharmacy": "1mg",
             "name": name,
-            "price": price,                   # Discounted price
-            "mrp": mrp,                       # Original MRP
-            "discount_percent": discount,     # Discount %
+            "price": price,
+            "mrp": mrp,
+            "discount_percent": discount,
             "link": link
         }
 
@@ -104,26 +99,12 @@ def run_1mg_search(query):
         browser.close()
         return product_link
 
-# Example usage
 if __name__ == "__main__":
-    query = "aricep 5 tablet"
+    query = " ".join(sys.argv[1:]) or "aricep 5 tablet"
     link = run_1mg_search(query)
     if link:
         data = scrape_1mg_product(link)
-
-        # Load existing data if the CSV exists
-        try:
-            df_existing = pd.read_csv("best_1mg_product.csv")
-        except FileNotFoundError:
-            df_existing = pd.DataFrame()
-
-        # Append new row
-        df_new = pd.DataFrame([data])
-        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-
-        # Save back to CSV
-        df_combined.to_csv("best_1mg_product.csv", index=False)
-        print("\n💾 Data saved to best_1mg_product.csv")
-
+        print(json.dumps(data))
     else:
-        print("❌ Product not found.")
+        print(json.dumps({"error": "Product not found", "query": query}))
+        sys.exit(1)

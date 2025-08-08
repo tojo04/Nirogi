@@ -1,5 +1,6 @@
+import json
+import sys
 import requests
-import pandas as pd
 from playwright.sync_api import sync_playwright
 
 SERPAPI_KEY = "c503d3982928b9e362f9422fc06976db7db142872cdf72a94b4f83eb608ca5e0"  # 🔐 Replace this with your SerpAPI key
@@ -69,12 +70,6 @@ def scrape_1mg_product(link):
 
         browser.close()
 
-        print("✅ Extracted Data:")
-        print("Name:", name)
-        print("Price:", price)
-        print("MRP:", mrp)
-        print("Discount %:", discount)
-
         return {
             "pharmacy": "1mg",
             "name": name,
@@ -84,16 +79,11 @@ def scrape_1mg_product(link):
             "link": link
         }
 
-def run(query):
+if __name__ == "__main__":
+    query = " ".join(sys.argv[1:]) or "aricep 5 tablet"
     product_url = get_1mg_product_link(query)
     if not product_url:
-        return
-
+        print(json.dumps({"error": "Product not found", "query": query}))
+        sys.exit(1)
     data = scrape_1mg_product(product_url)
-    df = pd.DataFrame([data])
-    df.to_csv("best_1mg_product.csv", index=False)
-    print("📄 Saved to best_1mg_product.csv")
-
-# Example usage
-if __name__ == "__main__":
-    run("aricep 5 tablet")
+    print(json.dumps(data))
