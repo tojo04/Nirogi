@@ -1,13 +1,17 @@
 import json
+import os
 import sys
 import requests
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 from serpapi import GoogleSearch
 
-SERPAPI_KEY = "c503d3982928b9e362f9422fc06976db7db142872cdf72a94b4f83eb608ca5e0"
+SERPAPI_KEY = os.environ.get("SERPAPI_KEY")
 
 def get_pharmeasy_link(query):
+    if not SERPAPI_KEY:
+        print(json.dumps({"error": "SERPAPI_KEY not set"}))
+        sys.exit(1)
     params = {
         "engine": "google",
         "q": f"{query} site:pharmeasy.in",
@@ -20,12 +24,12 @@ def get_pharmeasy_link(query):
 
     for result in data:
         link = result.get("link", "").strip()
-        print(f"🔗 Found: {link}")
+        print(f"🔗 Found: {link}", file=sys.stderr)
         if "pharmeasy.in/online-medicine-order/" in link:
-            print(f"✅ Using link: {link}")
+            print(f"✅ Using link: {link}", file=sys.stderr)
             return link
 
-    print("❌ No valid PharmEasy link found.")
+    print("❌ No valid PharmEasy link found.", file=sys.stderr)
     return None
 def scrape_pharmeasy_product(link):
     from playwright.sync_api import sync_playwright

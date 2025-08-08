@@ -1,12 +1,16 @@
 import json
+import os
 import sys
 import requests
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 
-SERPAPI_KEY = "c503d3982928b9e362f9422fc06976db7db142872cdf72a94b4f83eb608ca5e0"  # Replace with your real key
+SERPAPI_KEY = os.environ.get("SERPAPI_KEY")
 
 def get_netmeds_link_from_serpapi(query):
+    if not SERPAPI_KEY:
+        print(json.dumps({"error": "SERPAPI_KEY not set"}))
+        sys.exit(1)
     params = {
         "engine": "google",
         "q": f"{query} site:netmeds.com",
@@ -20,12 +24,12 @@ def get_netmeds_link_from_serpapi(query):
         for result in results:
             link = result.get("link", "")
             if "/prescriptions/" in link:
-                print(f"✅ Found product link: {link}")
+                print(f"✅ Found product link: {link}", file=sys.stderr)
                 return link
     except Exception as e:
-        print(f"❌ Error from SerpAPI: {e}")
+        print(f"❌ Error from SerpAPI: {e}", file=sys.stderr)
 
-    print("❌ No valid Netmeds product link found.")
+    print("❌ No valid Netmeds product link found.", file=sys.stderr)
     return None
 
 def scrape_netmeds_product(link):
@@ -37,7 +41,7 @@ def scrape_netmeds_product(link):
         try:
             page.wait_for_selector("div.price-box", timeout=8000)
         except:
-            print("⚠️ Product price section didn’t load.")
+            print("⚠️ Product price section didn’t load.", file=sys.stderr)
 
         # Name
         try:

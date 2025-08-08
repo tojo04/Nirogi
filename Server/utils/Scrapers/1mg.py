@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 
 def get_1mg_product_link_from_search(page, query):
     search_url = f"https://www.1mg.com/search/all?name={quote(query)}"
-    print(f"🔍 Searching: {search_url}")
+    print(f"🔍 Searching: {search_url}", file=sys.stderr)
     page.goto(search_url, timeout=60000)
     page.wait_for_timeout(5000)  # Let JS render fully
 
@@ -15,12 +15,12 @@ def get_1mg_product_link_from_search(page, query):
         if first_result:
             href = first_result.get_attribute("href")
             full_link = f"https://www.1mg.com{href}"
-            print(f"✅ Found product link: {full_link}")
+            print(f"✅ Found product link: {full_link}", file=sys.stderr)
             return full_link
     except Exception as e:
-        print(f"❌ Error while fetching product link: {e}")
+        print(f"❌ Error while fetching product link: {e}", file=sys.stderr)
 
-    print("❌ No product found for query.")
+    print("❌ No product found for query.", file=sys.stderr)
     return None
 
 def scrape_1mg_product(link):
@@ -35,7 +35,7 @@ def scrape_1mg_product(link):
         try:
             page.wait_for_selector("div[class*='DrugPriceBox']", timeout=8000)
         except:
-            print("⚠️ DrugPriceBox didn't appear in time.")
+            print("⚠️ DrugPriceBox didn't appear in time.", file=sys.stderr)
 
         # Product Name
         try:
