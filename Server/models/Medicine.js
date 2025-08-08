@@ -1,15 +1,69 @@
 const mongoose = require('mongoose');
 
-const MedicineSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true
+const MedicineSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true
+    },
+    description: {
+      type: String,
+      default: ''
+    },
+    strength: {
+      type: Number
+    },
+    unit: {
+      type: String,
+      trim: true
+    },
+    brand: {
+      type: String,
+      trim: true
+    },
+    manufacturer: {
+      type: String,
+      trim: true
+    },
+    pharmacyOffers: {
+      type: [
+        {
+          pharmacy: {
+            type: String,
+            required: true,
+            trim: true
+          },
+          price: {
+            type: Number,
+            required: true
+          },
+          mrp: {
+            type: Number
+          },
+          discountPercent: {
+            type: Number
+          },
+          link: {
+            type: String,
+            trim: true
+          },
+          lastUpdated: {
+            type: Date,
+            default: Date.now
+          }
+        }
+      ],
+      default: []
+    },
+    drugClass: {
+      type: String,
+      trim: true,
+      index: true
+    }
   },
-  description: {
-    type: String,
-    default: ''
-  }
-});
+  { timestamps: true }
+);
 
 module.exports = mongoose.model('Medicine', MedicineSchema);
