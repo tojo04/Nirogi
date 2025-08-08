@@ -4,8 +4,14 @@ const PriceCache = require('../models/PriceCache');
 
 // Note: Python scrapers handle SERP lookups internally. We pass the query through.
 // Add a per-process timeout to avoid hanging.
-function runScraper(scriptPath, query, timeoutMs = 25000) {
-  const pythonCandidates = process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python'];
+function runScraper(scriptPath, query, timeoutMs = 60000) {
+  // Prefer the venv interpreter in utils/Scrapers if present
+  const scrapersDir = path.join(__dirname, '../utils/Scrapers');
+  const venvWin = path.join(scrapersDir, '.venv', 'Scripts', 'python.exe');
+  const venvNix = path.join(scrapersDir, '.venv', 'bin', 'python');
+  const pythonCandidates = [venvWin, venvNix].concat(
+    process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python']
+  );
   return new Promise((resolve, reject) => {
     let settled = false;
     let proc;
@@ -127,18 +133,19 @@ exports.getPrices = async (req, res, next) => {
     };
 
     const rawResults = {};
-    for (const [key, script] of Object.entries(SCRAPERS)) {
-      try {
-        rawResults[key] = await runScraper(script, medicine);
-      } catch (err) {
-        // One retry per source
-        try {
-          rawResults[key] = await runScraper(script, medicine);
-        } catch (err2) {
-          rawResults[key] = { error: err2.message };
-        }
+    // Run all scrapers concurrently with individual timeouts
+    const entries = Object.entries(SCRAPERS);
+    const settled = await Promise.allSettled(
+      entries.map(([key, script]) => runScraper(script, medicine))
+    );
+    settled.forEach((res, idx) => {
+      const key = entries[idx][0];
+      if (res.status === 'fulfilled') {
+        rawResults[key] = res.value;
+      } else {
+        rawResults[key] = { error: res.reason?.message || 'scraper error' };
       }
-    }
+    });
 
     const prices = normalizeResults(rawResults);
 

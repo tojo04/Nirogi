@@ -1,37 +1,31 @@
 import json
-import os
 import sys
 import requests
 from urllib.parse import quote
 import re
 from playwright.sync_api import sync_playwright
 
-SERPAPI_KEY = os.environ.get("SERPAPI_KEY")
-
-def get_netmeds_link_from_serpapi(query):
-    if not SERPAPI_KEY:
-        print(json.dumps({"error": "SERPAPI_KEY not set"}))
-        sys.exit(1)
-    params = {
-        "engine": "google",
-        "q": f"{query} site:netmeds.com",
-        "api_key": SERPAPI_KEY
-    }
-
-    try:
-        response = requests.get("https://serpapi.com/search", params=params)
-        data = response.json()
-        results = data.get("organic_results", [])
-        for result in results:
-            link = result.get("link", "")
-            if "/prescriptions/" in link:
-                print(f"✅ Found product link: {link}", file=sys.stderr)
+def get_netmeds_link(query):
+    # Use on-site search to avoid external dependencies
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        search_url = f"https://www.netmeds.com/catalogsearch/result?q={quote(query)}"
+        page.goto(search_url, timeout=60000)
+        page.wait_for_timeout(5000)
+        try:
+            el = page.query_selector("a[href*='/prescriptions/']") or page.query_selector("a[href*='/non-prescriptions/']") or page.query_selector("a[href*='/product/']")
+            if el:
+                href = el.get_attribute("href")
+                link = href if href.startswith("http") else f"https://www.netmeds.com{href}"
+                print(f"✅ Netmeds link: {link}", file=sys.stderr)
+                browser.close()
                 return link
-    except Exception as e:
-        print(f"❌ Error from SerpAPI: {e}", file=sys.stderr)
-
-    print("❌ No valid Netmeds product link found.", file=sys.stderr)
-    return None
+        except Exception as e:
+            print(f"❌ Netmeds search error: {e}", file=sys.stderr)
+        browser.close()
+        print("❌ No valid Netmeds product link found.", file=sys.stderr)
+        return None
 
 def scrape_netmeds_product(link):
     with sync_playwright() as p:
@@ -101,7 +95,7 @@ def scrape_netmeds_product(link):
 
 if __name__ == "__main__":
     query = " ".join(sys.argv[1:]) or "Cetcip 10mg"
-    link = get_netmeds_link_from_serpapi(query)
+    link = get_netmeds_link(query)
     if link:
         data = scrape_netmeds_product(link)
         print(json.dumps(data))
