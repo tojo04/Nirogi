@@ -111,90 +111,46 @@ const MedicationsPage = () => {
 
             {/* Medications Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-
+              {filteredMedications.map((medication) => (
+                <div key={medication?._id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{medication?.name ?? 'Unknown'}</h3>
+                    {medication?.drugClass && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                        {medication.drugClass}
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-600">
-<
                       <span className="font-medium">Brand:</span> {medication?.brand ?? 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Strength:</span> {`${medication?.strength ?? ''} ${medication?.unit ?? ''}`.trim() || 'N/A'}
                     </p>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Class:</span> {medication?.drugClass ?? 'N/A'}
-      </p>
                   </div>
 
                   {medication?.description && (
                     <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                      {medication?.description}
+                      {medication.description}
                     </p>
                   )}
 
-                  <div className="space-y-2 mb-4">
-                    {medication?.indications?.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-1">Indications:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {(medication.indications?.slice(0, 2) ?? []).map((indication, index) => (
-                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                              {indication}
-                            </span>
-                          ))}
-                          {medication.indications?.length > 2 && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                              +{(medication.indications?.length ?? 0) - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {medication?.sideEffects?.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-1">Side Effects:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {(medication.sideEffects?.slice(0, 2) ?? []).map((effect, index) => (
-                            <span key={index} className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                              {effect}
-                            </span>
-                          ))}
-                          {medication.sideEffects?.length > 2 && (
-                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                              +{(medication.sideEffects?.length ?? 0) - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
                   <div className="flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
                       {medication?.rxRequired && (
-                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                          Rx Required
-                        </span>
+                        <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Rx Required</span>
                       )}
                       {medication?.controlledSubstance && (
-                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
-                          Controlled
-                        </span>
-                      )}
-                      {medication?.fdaApproved && (
-                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                          FDA Approved
-                        </span>
+                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Controlled</span>
                       )}
                     </div>
-                    <span className={`px-2 py-1 rounded ${
-                      medication?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {medication?.isActive ? 'Active' : 'Inactive'}
-                    </span>
+                    {typeof medication?.isActive === 'boolean' && (
+                      <span className={`px-2 py-1 rounded ${medication.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {medication.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
