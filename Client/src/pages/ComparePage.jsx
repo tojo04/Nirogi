@@ -63,9 +63,27 @@ const ComparePage = () => {
 
     try {
       const response = await pricesAPI.get(medication.name);
-      setPrices(response.data?.data?.prices || response.data?.prices || response.data || []);
+      const payload = response.data?.data || response.data || {};
+      const prices = payload.prices || [];
+      if (payload.error) {
+        setError(payload.error);
+        setPrices([]);
+        return;
+      }
+      if (!Array.isArray(prices) || prices.length === 0) {
+        setError('No prices found for this medicine. Try refining the name or try again later.');
+        setPrices([]);
+        return;
+      }
+      setPrices(prices);
     } catch (error) {
-      setError('Error fetching prices. Please try again.');
+      const isTimeout = error?.code === 'ECONNABORTED' || /timeout/i.test(String(error?.message || ''));
+      if (isTimeout) {
+        setError('Price lookup timed out. Please try again, or try a different medicine.');
+      } else {
+        const message = error?.response?.data?.error || error?.message || 'Error fetching prices. Please try again.';
+        setError(message);
+      }
       console.error('Price fetch error:', error);
     } finally {
       setLoading(false);
@@ -97,12 +115,15 @@ const ComparePage = () => {
           <h2 className="text-2xl font-semibold text-text mb-6">Find Your Medication</h2>
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
             <input
+              id="medication"
+              name="q"
               type="text"
               placeholder="e.g., Amoxicillin 500mg, Lisinopril 10mg"
               className="input-field flex-grow"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               disabled={loading}
+              autoComplete="off"
             />
             <button
               type="submit"
@@ -135,7 +156,7 @@ const ComparePage = () => {
                     {medication.name}
                   </h3>
                   <p className="text-gray-600 mb-2">
-                    {medication.genericName} {medication.dosage.strength}{medication.dosage.unit}
+                    {(medication.genericName || medication.name || '').trim()} {medication.dosage?.strength ?? ''}{medication.dosage?.unit ?? ''}
                   </p>
                   <div className="flex items-center justify-between">
                     <span className={`px-2 py-1 rounded text-xs ${
@@ -146,7 +167,7 @@ const ComparePage = () => {
                       {medication.isGeneric ? 'Generic' : 'Brand'}
                     </span>
                     <span className="text-sm text-gray-500">
-                      {medication.drugClass}
+                      {medication.drugClass || ''}
                     </span>
                   </div>
                 </div>

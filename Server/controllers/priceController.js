@@ -29,8 +29,6 @@ function runScraper(scriptPath, query, timeoutMs = 25000) {
 
     let out = '';
     let err = '';
-    let out = '';
-    let err = '';
 
     const wireUp = (cmd) => {
       out = '';
@@ -144,7 +142,9 @@ exports.getPrices = async (req, res, next) => {
 
     const prices = normalizeResults(rawResults);
 
-    const response = prices.length > 0 ? { prices } : { prices, error: 'No prices found from sources' };
+    const response = prices.length > 0
+      ? { prices, sources: rawResults }
+      : { prices, error: 'No prices found from sources', sources: rawResults };
     await PriceCache.findOneAndUpdate(
       { medicine },
       { data: response, updatedAt: new Date() },

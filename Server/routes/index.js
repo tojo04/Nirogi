@@ -3,9 +3,11 @@ const router = express.Router();
 
 const medicineRoutes = require('./medicineRoutes');
 const priceRoutes = require('./priceRoutes');
+const authRoutes = require('./authRoutes');
 
 router.use('/medications', medicineRoutes);
 router.use('/prices', priceRoutes);
+router.use('/auth', authRoutes);
 
 // Basic status endpoint
 router.get('/', (req, res) => {

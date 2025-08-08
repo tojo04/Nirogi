@@ -4,30 +4,31 @@ import { useAuth } from '../contexts/AuthContext';
 import { usersAPI } from '../services/api';
 
 const DashboardPage = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [error, setError] = useState('');
   useEffect(() => {
-    if (loading) return; // Wait for auth check to finish
+    // Wait for auth check in context to finish
+    if (authLoading) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
     loadDashboardData();
     // eslint-disable-next-line
-  }, [loading]); // Only run when loading changes
+  }, [authLoading]); // Run when auth loading changes
 
   const loadDashboardData = async () => {
     try {
-      setLoading(true);
+      setDashboardLoading(true);
       const response = await usersAPI.getDashboard();
       setDashboardData(response.data.data);
     } catch (error) {
       setError('Failed to load dashboard data');
     } finally {
-      setLoading(false);
+      setDashboardLoading(false);
     }
   };
 
@@ -40,7 +41,7 @@ const DashboardPage = () => {
     return null;
   }
 
-  if (loading) {
+  if (dashboardLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
