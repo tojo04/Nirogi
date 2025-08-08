@@ -9,7 +9,6 @@ const MedicationsPage = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClass, setFilterClass] = useState('all');
-  const [filterType, setFilterType] = useState('all');
 
   useEffect(() => {
     loadMedications();
@@ -19,7 +18,7 @@ const MedicationsPage = () => {
     try {
       setLoading(true);
       const response = await medicationsAPI.search('', 100);
-      setMedications(response.data.data);
+      setMedications(response.data?.data ?? []);
     } catch (error) {
       console.error('Error loading medications:', error);
       setError('Failed to load medications');
@@ -28,20 +27,18 @@ const MedicationsPage = () => {
     }
   };
 
-  const filteredMedications = medications.filter(medication => {
-    const matchesSearch = medication.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         medication.genericName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         medication.brandName?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesClass = filterClass === 'all' || medication.drugClass === filterClass;
-    const matchesType = filterType === 'all' || 
-                       (filterType === 'generic' && medication.isGeneric) ||
-                       (filterType === 'brand' && !medication.isGeneric);
-    
-    return matchesSearch && matchesClass && matchesType;
+  const filteredMedications = medications.filter((medication) => {
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      (medication?.name?.toLowerCase() ?? '').includes(query) ||
+      (medication?.brand?.toLowerCase() ?? '').includes(query);
+
+    const matchesClass = filterClass === 'all' || medication?.drugClass === filterClass;
+
+    return matchesSearch && matchesClass;
   });
 
-  const drugClasses = [...new Set(medications.map(med => med.drugClass))].sort();
+  const drugClasses = [...new Set(medications.map(med => med?.drugClass).filter(Boolean))].sort();
 
   if (loading) {
     return (
@@ -82,7 +79,7 @@ const MedicationsPage = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Search medications by name, generic name, or brand name..."
+                  placeholder="Search medications by name or brand..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
@@ -101,17 +98,6 @@ const MedicationsPage = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="generic">Generic Only</option>
-                    <option value="brand">Brand Only</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -124,71 +110,61 @@ const MedicationsPage = () => {
 
             {/* Medications Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMedications.map((medication) => (
-                <div key={medication._id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{medication.name}</h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      medication.isGeneric ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {medication.isGeneric ? 'Generic' : 'Brand'}
-                    </span>
+              {filteredMedications.map((medication, index) => (
+                <div key={medication?._id || index} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{medication?.name ?? 'Unknown'}</h3>
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium">Generic:</span> {medication.genericName}
-                    </p>
-                    {medication.brandName && (
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Brand:</span> {medication.brandName}
-                      </p>
-                    )}
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Dosage:</span> {medication.dosage.strength}{medication.dosage.unit} {medication.dosage.form}
+                      <span className="font-medium">Brand:</span> {medication?.brand ?? 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium">Class:</span> {medication.drugClass}
+                      <span className="font-medium">Strength:</span> {`${medication?.strength ?? ''} ${medication?.unit ?? ''}`.trim() || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Class:</span> {medication?.drugClass ?? 'N/A'}
                     </p>
                   </div>
 
-                  {medication.description && (
+                  {medication?.description && (
                     <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                      {medication.description}
+                      {medication?.description}
                     </p>
                   )}
 
                   <div className="space-y-2 mb-4">
-                    {medication.indications && medication.indications.length > 0 && (
+                    {medication?.indications?.length > 0 && (
                       <div>
                         <p className="text-xs font-medium text-gray-500 mb-1">Indications:</p>
                         <div className="flex flex-wrap gap-1">
-                          {medication.indications.slice(0, 2).map((indication, index) => (
+                          {(medication.indications?.slice(0, 2) ?? []).map((indication, index) => (
                             <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
                               {indication}
                             </span>
                           ))}
-                          {medication.indications.length > 2 && (
+                          {medication.indications?.length > 2 && (
                             <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                              +{medication.indications.length - 2} more
+                              +{(medication.indications?.length ?? 0) - 2} more
                             </span>
                           )}
                         </div>
                       </div>
                     )}
 
-                    {medication.sideEffects && medication.sideEffects.length > 0 && (
+                    {medication?.sideEffects?.length > 0 && (
                       <div>
                         <p className="text-xs font-medium text-gray-500 mb-1">Side Effects:</p>
                         <div className="flex flex-wrap gap-1">
-                          {medication.sideEffects.slice(0, 2).map((effect, index) => (
+                          {(medication.sideEffects?.slice(0, 2) ?? []).map((effect, index) => (
                             <span key={index} className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
                               {effect}
                             </span>
                           ))}
-                          {medication.sideEffects.length > 2 && (
+                          {medication.sideEffects?.length > 2 && (
                             <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                              +{medication.sideEffects.length - 2} more
+                              +{(medication.sideEffects?.length ?? 0) - 2} more
                             </span>
                           )}
                         </div>
@@ -198,26 +174,26 @@ const MedicationsPage = () => {
 
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <div className="flex items-center space-x-4">
-                      {medication.rxRequired && (
+                      {medication?.rxRequired && (
                         <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                           Rx Required
                         </span>
                       )}
-                      {medication.controlledSubstance && (
+                      {medication?.controlledSubstance && (
                         <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
                           Controlled
                         </span>
                       )}
-                      {medication.fdaApproved && (
+                      {medication?.fdaApproved && (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
                           FDA Approved
                         </span>
                       )}
                     </div>
                     <span className={`px-2 py-1 rounded ${
-                      medication.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      medication?.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
-                      {medication.isActive ? 'Active' : 'Inactive'}
+                      {medication?.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>
