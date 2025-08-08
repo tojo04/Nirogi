@@ -79,6 +79,11 @@ export const comparisonsAPI = {
   delete: (id) => api.delete(`/comparisons/${id}`),
 };
 
+// Prices API calls
+export const pricesAPI = {
+  get: (medicine) => api.get(`/prices/${encodeURIComponent(medicine)}`),
+};
+
 // Users API calls
 export const usersAPI = {
   getDashboard: () => api.get('/users/dashboard'),
