@@ -103,6 +103,54 @@ const ComparePage = () => {
     }
   };
 
+  // Allow direct comparison using the typed query without selecting a medication
+  const handleCompareTypedQuery = async () => {
+    const query = (searchQuery || '').trim();
+    if (!isAuthenticated) {
+      setError('Please log in to compare prices.');
+      return;
+    }
+    if (!query) {
+      setError('Please enter a medication name.');
+      setPrices([]);
+      setSelectedMedication(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setPrices([]);
+    setSelectedMedication(null);
+
+    try {
+      const response = await pricesAPI.get(query);
+      const payload = response.data?.data || response.data || {};
+      const nextPrices = payload.prices || [];
+      if (payload.error) {
+        setError(payload.error);
+        setPrices([]);
+        return;
+      }
+      if (!Array.isArray(nextPrices) || nextPrices.length === 0) {
+        setError('No prices found for this medicine. Try refining the name or try again later.');
+        setPrices([]);
+        return;
+      }
+      setPrices(nextPrices);
+    } catch (error) {
+      const isTimeout = error?.code === 'ECONNABORTED' || /timeout/i.test(String(error?.message || ''));
+      if (isTimeout) {
+        setError('Price lookup timed out. Please try again, or try a different medicine.');
+      } else {
+        const message = error?.response?.data?.error || error?.message || 'Error fetching prices. Please try again.';
+        setError(message);
+      }
+      console.error('Price fetch error (typed query):', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen py-16 px-4 relative z-10">
       <div className="max-w-7xl mx-auto">
@@ -125,13 +173,23 @@ const ComparePage = () => {
               disabled={loading}
               autoComplete="off"
             />
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={loading}
+              >
+                {loading ? 'Searching...' : 'Search'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleCompareTypedQuery}
+                disabled={loading}
+              >
+                {loading ? 'Comparing...' : 'Compare now'}
+              </button>
+            </div>
           </form>
 
           {error && (

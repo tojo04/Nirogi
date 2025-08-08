@@ -3,7 +3,7 @@ const config = {
     api: {
       baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
       // Increase default timeout to accommodate scraping on /prices
-      timeout: 30000,
+      timeout: 90000,
     },
     
     // App Configuration

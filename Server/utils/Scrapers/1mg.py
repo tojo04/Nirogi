@@ -7,8 +7,8 @@ import re
 def get_1mg_product_link_from_search(page, query):
     search_url = f"https://www.1mg.com/search/all?name={quote(query)}"
     print(f"🔍 Searching: {search_url}", file=sys.stderr)
-    page.goto(search_url, timeout=60000)
-    page.wait_for_timeout(5000)  # Let JS render fully
+    page.goto(search_url, timeout=20000)
+    page.wait_for_timeout(2000)  # Let JS render
 
     # Reliable selector for first product link
     try:
@@ -30,11 +30,11 @@ def scrape_1mg_product(link):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(link, timeout=60000)
+        page.goto(link, timeout=20000)
 
         # Wait until price info appears
         try:
-            page.wait_for_selector("div[class*='DrugPriceBox']", timeout=8000)
+            page.wait_for_selector("div[class*='DrugPriceBox']", timeout=6000)
         except:
             print("⚠️ DrugPriceBox didn't appear in time.", file=sys.stderr)
 

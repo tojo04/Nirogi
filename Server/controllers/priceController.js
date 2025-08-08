@@ -1,17 +1,43 @@
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 const PriceCache = require('../models/PriceCache');
 
 // Note: Python scrapers handle SERP lookups internally. We pass the query through.
 // Add a per-process timeout to avoid hanging.
-function runScraper(scriptPath, query, timeoutMs = 60000) {
+// Resolve Python interpreter once per process
+function resolvePythonInterpreter() {
+  const scrapersDir = path.join(__dirname, '../utils/Scrapers');
+  const candidates = [
+    process.env.PYTHON_PATH,
+    path.join(scrapersDir, 'venv', 'Scripts', 'python.exe'),
+    path.join(scrapersDir, '.venv', 'Scripts', 'python.exe'),
+    path.join(scrapersDir, 'venv', 'bin', 'python'),
+    path.join(scrapersDir, '.venv', 'bin', 'python'),
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch (_) {}
+  }
+  // Fallbacks to PATH commands
+  return process.platform === 'win32' ? 'py' : 'python3';
+}
+
+const resolvedPython = resolvePythonInterpreter();
+console.log(`[prices] Using Python interpreter: ${resolvedPython}`);
+
+function runScraper(scriptPath, query, timeoutMs = 40000) {
   // Prefer the venv interpreter in utils/Scrapers if present
   const scrapersDir = path.join(__dirname, '../utils/Scrapers');
-  const venvWin = path.join(scrapersDir, '.venv', 'Scripts', 'python.exe');
-  const venvNix = path.join(scrapersDir, '.venv', 'bin', 'python');
-  const pythonCandidates = [venvWin, venvNix].concat(
-    process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python']
-  );
+  const venvWinDot = path.join(scrapersDir, '.venv', 'Scripts', 'python.exe');
+  const venvNixDot = path.join(scrapersDir, '.venv', 'bin', 'python');
+  const venvWin = path.join(scrapersDir, 'venv', 'Scripts', 'python.exe');
+  const venvNix = path.join(scrapersDir, 'venv', 'bin', 'python');
+  const envPython = process.env.PYTHON_PATH;
+  const pythonCandidates = [resolvedPython, envPython, venvWin, venvWinDot, venvNix, venvNixDot]
+    .concat(process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python'])
+    .filter(Boolean);
   return new Promise((resolve, reject) => {
     let settled = false;
     let proc;
@@ -19,7 +45,12 @@ function runScraper(scriptPath, query, timeoutMs = 60000) {
 
     const start = () => {
       const cmd = pythonCandidates[candidateIndex];
-      proc = spawn(cmd, [scriptPath, query]);
+      console.log(`[prices] Starting scraper: cmd="${cmd}" script="${scriptPath}" query="${query}"`);
+      proc = spawn(cmd, [scriptPath, query], {
+        cwd: path.dirname(scriptPath),
+        env: { ...process.env },
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
       wireUp(cmd);
     };
 
@@ -36,15 +67,25 @@ function runScraper(scriptPath, query, timeoutMs = 60000) {
     let out = '';
     let err = '';
 
+    const killProcess = () => {
+      try {
+        if (process.platform === 'win32') {
+          // Force kill on Windows
+          spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F']);
+        } else {
+          proc.kill('SIGKILL');
+        }
+      } catch (_) {}
+    };
+
     const wireUp = (cmd) => {
       out = '';
       err = '';
       const timer = setTimeout(() => {
-        try {
-          proc.kill('SIGKILL');
-        } catch (_) {}
+        killProcess();
         if (!settled) {
           settled = true;
+          console.warn(`[prices] Scraper timeout: cmd="${cmd}" script="${scriptPath}"`);
           reject(new Error('scraper timeout'));
         }
       }, timeoutMs);
@@ -58,9 +99,11 @@ function runScraper(scriptPath, query, timeoutMs = 60000) {
       proc.on('error', (e) => {
         clearTimeout(timer);
         if ((e.code === 'ENOENT' || /not found/i.test(String(e))) && !settled) {
+          console.warn(`[prices] Python not found at "${cmd}". Trying next candidate...`);
           tryNext(`python command not found: ${cmd}`);
         } else if (!settled) {
           settled = true;
+          console.error(`[prices] Scraper process error for cmd="${cmd}"`, e);
           reject(e);
         }
       });
@@ -73,6 +116,7 @@ function runScraper(scriptPath, query, timeoutMs = 60000) {
             tryNext(err);
           } else {
             settled = true;
+            console.error(`[prices] Scraper exited with code ${code}. stderr=\n${err}\nstdout=\n${out}`);
             reject(new Error(err || 'scraper failed'));
           }
           return;
@@ -83,6 +127,7 @@ function runScraper(scriptPath, query, timeoutMs = 60000) {
           resolve(parsed);
         } catch (e) {
           settled = true;
+          console.error(`[prices] Failed to parse scraper output. stderr=\n${err}\nstdout=\n${out}`);
           reject(e);
         }
       });
@@ -119,10 +164,12 @@ function normalizeResults(rawBySource) {
 exports.getPrices = async (req, res, next) => {
   try {
     const { medicine } = req.params;
+    const { source } = req.query || {};
+    const noCache = String(req.query?.noCache || '') === '1';
 
     // Cache hit
-    const cached = await PriceCache.findOne({ medicine });
-    if (cached?.data) {
+    const cached = !noCache ? await PriceCache.findOne({ medicine }) : null;
+    if (!noCache && cached?.data?.prices && Array.isArray(cached.data.prices) && cached.data.prices.length > 0) {
       return res.json(cached.data);
     }
 
@@ -133,30 +180,33 @@ exports.getPrices = async (req, res, next) => {
     };
 
     const rawResults = {};
-    // Run all scrapers concurrently with individual timeouts
-    const entries = Object.entries(SCRAPERS);
-    const settled = await Promise.allSettled(
-      entries.map(([key, script]) => runScraper(script, medicine))
-    );
-    settled.forEach((res, idx) => {
-      const key = entries[idx][0];
-      if (res.status === 'fulfilled') {
-        rawResults[key] = res.value;
-      } else {
-        rawResults[key] = { error: res.reason?.message || 'scraper error' };
+    // Optionally run a single source for debugging
+    const entries = source && SCRAPERS[source]
+      ? [[source, SCRAPERS[source]]]
+      : Object.entries(SCRAPERS);
+    // Run scrapers sequentially to avoid concurrent Chromium launches on Windows
+    for (const [key, script] of entries) {
+      try {
+        rawResults[key] = await runScraper(script, medicine);
+      } catch (e) {
+        rawResults[key] = { error: e?.message || 'scraper error' };
       }
-    });
+    }
 
     const prices = normalizeResults(rawResults);
 
     const response = prices.length > 0
       ? { prices, sources: rawResults }
       : { prices, error: 'No prices found from sources', sources: rawResults };
-    await PriceCache.findOneAndUpdate(
-      { medicine },
-      { data: response, updatedAt: new Date() },
-      { upsert: true }
-    );
+
+    // Only cache successful results to avoid pinning transient failures
+    if (!noCache && prices.length > 0) {
+      await PriceCache.findOneAndUpdate(
+        { medicine },
+        { data: response, updatedAt: new Date() },
+        { upsert: true }
+      );
+    }
 
     return res.json(response);
   } catch (err) {

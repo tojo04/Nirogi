@@ -31,10 +31,10 @@ def scrape_netmeds_product(link):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(link, timeout=60000)
+        page.goto(link, timeout=20000)
 
         try:
-            page.wait_for_selector("div.price-box", timeout=8000)
+            page.wait_for_selector("div.price-box", timeout=6000)
         except:
             print("⚠️ Product price section didn’t load.", file=sys.stderr)
 

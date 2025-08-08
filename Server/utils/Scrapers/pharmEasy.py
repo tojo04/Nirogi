@@ -11,8 +11,8 @@ def get_pharmeasy_link(query):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         search_url = f"https://pharmeasy.in/search/all?name={quote(query)}"
-        page.goto(search_url, timeout=60000)
-        page.wait_for_timeout(5000)
+        page.goto(search_url, timeout=20000)
+        page.wait_for_timeout(2000)
         try:
             el = page.query_selector("a[href*='/online-medicine-order/']")
             if el:
@@ -30,8 +30,8 @@ def scrape_pharmeasy_product(link):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(link, timeout=60000)
-        page.wait_for_timeout(5000)  # Let JS render
+        page.goto(link, timeout=20000)
+        page.wait_for_timeout(2000)  # Let JS render
 
         # Product name
         try:
