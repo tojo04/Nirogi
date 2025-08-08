@@ -1,11 +1,19 @@
 const express = require('express');
-
-const medicineRoutes = require('./medicineRoutes');
-const adminRoutes = require('./adminRoutes');
-
 const router = express.Router();
 
+const medicineRoutes = require('./medicineRoutes');
+
+const priceRoutes = require('./priceRoutes');
+
 router.use('/medications', medicineRoutes);
+router.use('/prices', priceRoutes);
+
+const adminRoutes = require('./adminRoutes');
+
+
+
+
+
 router.use('/admin', adminRoutes);
 
 // Basic status endpoint
@@ -14,5 +22,3 @@ router.get('/', (req, res) => {
 });
 
 module.exports = router;
-
-
