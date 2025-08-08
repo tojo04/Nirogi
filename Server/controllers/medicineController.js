@@ -9,7 +9,7 @@ exports.searchMedicines = async (req, res, next) => {
       : {};
 
     const medicines = await Medicine.find(query).limit(Number(limit));
-    res.json(medicines);
+    res.json({ data: medicines });
   } catch (err) {
     next(err);
   }
@@ -22,7 +22,7 @@ exports.getMedicineById = async (req, res, next) => {
     if (!medicine) {
       return res.status(404).json({ message: 'Medicine not found' });
     }
-    res.json(medicine);
+    res.json({ data: medicine });
   } catch (err) {
     next(err);
   }
@@ -32,7 +32,7 @@ exports.getMedicineById = async (req, res, next) => {
 exports.getByClass = async (req, res, next) => {
   try {
     const medicines = await Medicine.find({ drugClass: req.params.drugClass });
-    res.json(medicines);
+    res.json({ data: medicines });
   } catch (err) {
     next(err);
   }
@@ -45,7 +45,7 @@ exports.getPopular = async (req, res, next) => {
     const medicines = await Medicine.find()
       .sort({ popularity: -1 })
       .limit(Number(limit));
-    res.json(medicines);
+    res.json({ data: medicines });
   } catch (err) {
     next(err);
   }
@@ -55,7 +55,7 @@ exports.getPopular = async (req, res, next) => {
 exports.createMedicine = async (req, res, next) => {
   try {
     const medicine = await Medicine.create(req.body);
-    res.status(201).json(medicine);
+    res.status(201).json({ data: medicine });
   } catch (err) {
     next(err);
   }
@@ -71,7 +71,7 @@ exports.updateMedicine = async (req, res, next) => {
     if (!medicine) {
       return res.status(404).json({ message: 'Medicine not found' });
     }
-    res.json(medicine);
+    res.json({ data: medicine });
   } catch (err) {
     next(err);
   }

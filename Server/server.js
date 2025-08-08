@@ -16,7 +16,7 @@ async function startServer() {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
 
-    // Mount application routes
+    // Mount application routes (single mount point)
     app.use('/api/v1', routes);
 
     app.listen(PORT, () => {

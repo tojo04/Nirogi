@@ -2,106 +2,156 @@ const path = require('path');
 const { spawn } = require('child_process');
 const PriceCache = require('../models/PriceCache');
 
-const SERP_API_KEY = process.env.SERP_API_KEY;
-
-const SCRAPERS = {
-  '1mg': {
-    domain: '1mg.com',
-    script: path.join(__dirname, '../utils/Scrapers/1mg.py'),
-  },
-  pharmeasy: {
-    domain: 'pharmeasy.in',
-    script: path.join(__dirname, '../utils/Scrapers/pharmEasy.py'),
-  },
-  netmeds: {
-    domain: 'netmeds.com',
-    script: path.join(__dirname, '../utils/Scrapers/netmeds.py'),
-  },
-};
-
-async function fetchSerpLink(query, domain) {
-  if (!SERP_API_KEY) {
-    const msg = 'SERP API key is not set';
-    console.error(msg);
-    return { error: msg };
-  }
-
-  const params = new URLSearchParams({
-    engine: 'google',
-    q: `${query} site:${domain}`,
-    api_key: SERP_API_KEY,
-  });
-
-  try {
-    const res = await fetch(`https://serpapi.com/search.json?${params}`);
-    if (!res.ok) {
-      const msg = `SERP API responded with status ${res.status}`;
-      console.error(msg);
-      return { error: msg };
-    }
-    const data = await res.json();
-    const first = data?.organic_results?.[0];
-    return { link: first ? first.link : null };
-  } catch (err) {
-    console.error('SERP API request failed:', err);
-    return { error: err.message };
-  }
-}
-
-function runScraper(scriptPath, link) {
+// Note: Python scrapers handle SERP lookups internally. We pass the query through.
+// Add a per-process timeout to avoid hanging.
+function runScraper(scriptPath, query, timeoutMs = 25000) {
+  const pythonCandidates = process.platform === 'win32' ? ['py', 'python'] : ['python3', 'python'];
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', [scriptPath, link]);
+    let settled = false;
+    let proc;
+    let candidateIndex = 0;
+
+    const start = () => {
+      const cmd = pythonCandidates[candidateIndex];
+      proc = spawn(cmd, [scriptPath, query]);
+      wireUp(cmd);
+    };
+
+    const tryNext = (errMsg) => {
+      candidateIndex += 1;
+      if (candidateIndex < pythonCandidates.length) {
+        start();
+      } else if (!settled) {
+        settled = true;
+        reject(new Error(errMsg || 'unable to start python process'));
+      }
+    };
+
     let out = '';
     let err = '';
-    proc.stdout.on('data', (d) => (out += d.toString()));
-    proc.stderr.on('data', (d) => (err += d.toString()));
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        return reject(new Error(err || 'scraper failed'));
-      }
-      try {
-        resolve(JSON.parse(out));
-      } catch (e) {
-        reject(e);
-      }
-    });
+    let out = '';
+    let err = '';
+
+    const wireUp = (cmd) => {
+      out = '';
+      err = '';
+      const timer = setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (_) {}
+        if (!settled) {
+          settled = true;
+          reject(new Error('scraper timeout'));
+        }
+      }, timeoutMs);
+
+      proc.stdout.removeAllListeners();
+      proc.stderr.removeAllListeners();
+      proc.removeAllListeners();
+
+      proc.stdout.on('data', (d) => (out += d.toString()));
+      proc.stderr.on('data', (d) => (err += d.toString()));
+      proc.on('error', (e) => {
+        clearTimeout(timer);
+        if ((e.code === 'ENOENT' || /not found/i.test(String(e))) && !settled) {
+          tryNext(`python command not found: ${cmd}`);
+        } else if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (settled) return;
+        if (code !== 0) {
+          // If the command failed to run due to ENOENT, try next
+          if (err && /python|py/i.test(err) && /not found|is not recognized/.test(err)) {
+            tryNext(err);
+          } else {
+            settled = true;
+            reject(new Error(err || 'scraper failed'));
+          }
+          return;
+        }
+        try {
+          const parsed = JSON.parse(out);
+          settled = true;
+          resolve(parsed);
+        } catch (e) {
+          settled = true;
+          reject(e);
+        }
+      });
+    };
+
+    start();
   });
+}
+
+// Normalize outputs from scrapers into a simple array for the UI
+function normalizeResults(rawBySource) {
+  const items = [];
+  for (const [source, payload] of Object.entries(rawBySource)) {
+    if (!payload || payload.error) continue;
+
+    const pharmacy = payload.pharmacy || source;
+    const price = typeof payload.price === 'number' ? payload.price : null;
+    const mrp = typeof payload.mrp === 'number' ? payload.mrp : null;
+    const discountPercent =
+      typeof payload.discountPercent === 'number'
+        ? payload.discountPercent
+        : typeof payload.discount_percent === 'number'
+        ? payload.discount_percent
+        : null;
+    const url = payload.url || payload.link || null;
+
+    items.push({ pharmacy, price, mrp, discountPercent, url });
+  }
+  return items
+    .filter((i) => i.price !== null && !Number.isNaN(i.price))
+    .sort((a, b) => a.price - b.price);
 }
 
 exports.getPrices = async (req, res, next) => {
   try {
     const { medicine } = req.params;
 
-    let cached = await PriceCache.findOne({ medicine });
-    if (cached) {
+    // Cache hit
+    const cached = await PriceCache.findOne({ medicine });
+    if (cached?.data) {
       return res.json(cached.data);
     }
 
-    const result = {};
-    for (const [key, cfg] of Object.entries(SCRAPERS)) {
-      const { link, error } = await fetchSerpLink(medicine, cfg.domain);
-      if (error) {
-        result[key] = { error };
-        continue;
-      }
-      if (!link) {
-        result[key] = { error: 'No search results found' };
-        continue;
-      }
+    const SCRAPERS = {
+      '1mg': path.join(__dirname, '../utils/Scrapers/1mg.py'),
+      pharmeasy: path.join(__dirname, '../utils/Scrapers/pharmEasy.py'),
+      netmeds: path.join(__dirname, '../utils/Scrapers/netmeds.py'),
+    };
+
+    const rawResults = {};
+    for (const [key, script] of Object.entries(SCRAPERS)) {
       try {
-        result[key] = await runScraper(cfg.script, link);
+        rawResults[key] = await runScraper(script, medicine);
       } catch (err) {
-        result[key] = { error: err.message };
+        // One retry per source
+        try {
+          rawResults[key] = await runScraper(script, medicine);
+        } catch (err2) {
+          rawResults[key] = { error: err2.message };
+        }
       }
     }
 
+    const prices = normalizeResults(rawResults);
+
+    const response = prices.length > 0 ? { prices } : { prices, error: 'No prices found from sources' };
     await PriceCache.findOneAndUpdate(
       { medicine },
-      { data: result, updatedAt: new Date() },
+      { data: response, updatedAt: new Date() },
       { upsert: true }
     );
 
-    res.json(result);
+    return res.json(response);
   } catch (err) {
     next(err);
   }
