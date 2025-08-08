@@ -153,10 +153,12 @@ const ComparePage = () => {
                   onClick={() => handleMedicationSelect(medication)}
                 >
                   <h3 className="text-lg font-semibold text-text mb-2">
+
                     {medication?.name ?? 'Unknown'}
                   </h3>
                   <p className="text-gray-600 mb-2">
                     {`${medication?.brand ?? 'N/A'} - ${`${medication?.strength ?? ''} ${medication?.unit ?? ''}`.trim() || 'N/A'}`}
+
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">

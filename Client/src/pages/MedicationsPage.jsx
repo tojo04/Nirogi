@@ -30,6 +30,7 @@ const MedicationsPage = () => {
   const filteredMedications = medications.filter((medication) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
+
       (medication?.name?.toLowerCase() ?? '').includes(query) ||
       (medication?.brand?.toLowerCase() ?? '').includes(query);
 
@@ -110,14 +111,13 @@ const MedicationsPage = () => {
 
             {/* Medications Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredMedications.map((medication, index) => (
-                <div key={medication?._id || index} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{medication?.name ?? 'Unknown'}</h3>
+
+
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-600">
+<
                       <span className="font-medium">Brand:</span> {medication?.brand ?? 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">
@@ -125,7 +125,7 @@ const MedicationsPage = () => {
                     </p>
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Class:</span> {medication?.drugClass ?? 'N/A'}
-                    </p>
+      </p>
                   </div>
 
                   {medication?.description && (
