@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { medicationsAPI, comparisonsAPI } from '../services/api';
+import { medicationsAPI, pricesAPI } from '../services/api';
 
 const ComparePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [medications, setMedications] = useState([]);
   const [selectedMedication, setSelectedMedication] = useState(null);
-  const [results, setResults] = useState([]);
+  const [prices, setPrices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [quantity, setQuantity] = useState(30);
-  const [location, setLocation] = useState('');
   const { isAuthenticated } = useAuth();
 
   // Load popular medications on component mount
@@ -31,14 +29,14 @@ const ComparePage = () => {
     e.preventDefault();
     if (!searchQuery.trim()) {
       setError("Please enter a medication name.");
-      setResults([]);
+      setPrices([]);
       setSelectedMedication(null);
       return;
     }
 
     setLoading(true);
     setError(null);
-    setResults([]);
+    setPrices([]);
     setSelectedMedication(null);
 
     try {
@@ -61,30 +59,14 @@ const ComparePage = () => {
     setSelectedMedication(medication);
     setLoading(true);
     setError(null);
-    setResults([]);
+    setPrices([]);
 
     try {
-      // For demo purposes, using a default location
-      // In a real app, you'd get user's location or allow them to input it
-      const comparisonData = {
-        medicationId: medication._id,
-        dosage: medication.dosage,
-        quantity: quantity,
-        location: {
-          zipCode: location || '10001',
-          coordinates: [-73.935242, 40.730610] // Default NYC coordinates
-        },
-        filters: {
-          maxDistance: 10,
-          pharmacyType: ['chain', 'independent']
-        }
-      };
-
-      const response = await comparisonsAPI.compare(comparisonData);
-      setResults(response.data.data.results || []);
+      const response = await pricesAPI.get(medication.name);
+      setPrices(response.data?.data?.prices || response.data?.prices || response.data || []);
     } catch (error) {
-      setError('Error comparing prices. Please try again.');
-      console.error('Comparison error:', error);
+      setError('Error fetching prices. Please try again.');
+      console.error('Price fetch error:', error);
     } finally {
       setLoading(false);
     }
@@ -173,55 +155,13 @@ const ComparePage = () => {
           </div>
         )}
 
-        {/* Comparison Settings */}
-        {selectedMedication && (
-          <div className="card p-8 mb-12 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-            <h2 className="text-2xl font-semibold text-text mb-6">Comparison Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value))}
-                  className="input-field"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location (ZIP Code)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., 10001"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="input-field"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={() => handleMedicationSelect(selectedMedication)}
-                  className="btn-primary w-full"
-                  disabled={loading}
-                >
-                  {loading ? 'Comparing...' : 'Compare Prices'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Price Comparison Results */}
-        {results.length > 0 && (
-          <div className="card p-8 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-semibold text-text">
-                Price Comparison Results
-              </h2>
+          {/* Price Comparison Results */}
+          {prices.length > 0 && (
+            <div className="card p-8 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-text">
+                  Price Comparison Results
+                </h2>
               <button
                 onClick={handleSaveComparison}
                 className="btn-secondary"
@@ -230,58 +170,46 @@ const ComparePage = () => {
               </button>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-text">Pharmacy</th>
-                    <th className="text-left py-3 px-4 font-semibold text-text">Address</th>
-                    <th className="text-left py-3 px-4 font-semibold text-text">Distance</th>
-                    <th className="text-left py-3 px-4 font-semibold text-text">Price</th>
-                    <th className="text-left py-3 px-4 font-semibold text-text">Savings</th>
-                    <th className="text-left py-3 px-4 font-semibold text-text">Rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((result, index) => (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-text">
-                        {result.pharmacy}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600">
-                        {result.address}
-                      </td>
-                      <td className="py-3 px-4 text-gray-600">
-                        {result.distance}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-text">
-                        ${result.price}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          result.savings > 0 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {result.savings > 0 ? `$${result.savings}` : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <span className="text-yellow-400 mr-1">★</span>
-                          <span className="text-sm text-gray-600">{result.rating}</span>
-                        </div>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-text">Pharmacy</th>
+                      <th className="text-left py-3 px-4 font-semibold text-text">Price</th>
+                      <th className="text-left py-3 px-4 font-semibold text-text">Link</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {prices.map((result, index) => (
+                      <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4 font-medium text-text">
+                          {result.pharmacy || result.source}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-text">
+                          {result.price ? `₹${result.price}` : 'N/A'}
+                        </td>
+                        <td className="py-3 px-4">
+                          {result.url && (
+                            <a
+                              href={result.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline"
+                            >
+                              View
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
 };
 
 export default ComparePage;
