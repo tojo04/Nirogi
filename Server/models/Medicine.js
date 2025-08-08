@@ -63,7 +63,24 @@ const MedicineSchema = new mongoose.Schema(
       index: true
     }
   },
+
+  description: {
+    type: String,
+    default: ''
+  },
+  pricing: [
+    {
+      pharmacy: String,
+      price: Number,
+      mrp: Number,
+      discount_percent: Number,
+      link: String
+    }
+  ]
+});
+
   { timestamps: true }
 );
+
 
 module.exports = mongoose.model('Medicine', MedicineSchema);
