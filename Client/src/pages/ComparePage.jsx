@@ -19,7 +19,7 @@ const ComparePage = () => {
   const loadPopularMedications = async () => {
     try {
       const response = await medicationsAPI.getPopular();
-      setMedications(response.data.data);
+      setMedications(response.data?.data ?? []);
     } catch (error) {
       console.error('Error loading popular medications:', error);
     }
@@ -41,7 +41,7 @@ const ComparePage = () => {
 
     try {
       const response = await medicationsAPI.search(searchQuery, 10);
-      setMedications(response.data.data);
+      setMedications(response.data?.data ?? []);
     } catch (error) {
       setError('Error searching medications. Please try again.');
       console.error('Search error:', error);
@@ -62,7 +62,7 @@ const ComparePage = () => {
     setPrices([]);
 
     try {
-      const response = await pricesAPI.get(medication.name);
+      const response = await pricesAPI.get(medication?.name ?? '');
       const payload = response.data?.data || response.data || {};
       const prices = payload.prices || [];
       if (payload.error) {
@@ -146,21 +146,23 @@ const ComparePage = () => {
           <div className="card p-8 mb-12 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
             <h2 className="text-2xl font-semibold text-text mb-6">Available Medications</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {medications.map((medication) => (
+              {medications.map((medication, index) => (
                 <div
-                  key={medication._id}
+                  key={medication?._id || index}
                   className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-primary"
                   onClick={() => handleMedicationSelect(medication)}
                 >
                   <h3 className="text-lg font-semibold text-text mb-2">
-                    {medication.name || 'Unknown'}
+
+                    {medication?.name ?? 'Unknown'}
                   </h3>
                   <p className="text-gray-600 mb-2">
-                    {medication.brand ? `${medication.brand} - ` : ''}{`${medication.strength ?? ''} ${medication.unit ?? ''}`.trim()}
+                    {`${medication?.brand ?? 'N/A'} - ${`${medication?.strength ?? ''} ${medication?.unit ?? ''}`.trim() || 'N/A'}`}
+
                   </p>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">
-                      {medication.drugClass || ''}
+                      {medication?.drugClass ?? 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -197,13 +199,13 @@ const ComparePage = () => {
                     {prices.map((result, index) => (
                       <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 font-medium text-text">
-                          {result.pharmacy || result.source}
+                          {result?.pharmacy || result?.source || 'N/A'}
                         </td>
                         <td className="py-3 px-4 font-semibold text-text">
-                          {result.price ? `₹${result.price}` : 'N/A'}
+                          {result?.price ? `₹${result.price}` : 'N/A'}
                         </td>
                         <td className="py-3 px-4">
-                          {result.url && (
+                          {result?.url && (
                             <a
                               href={result.url}
                               target="_blank"
