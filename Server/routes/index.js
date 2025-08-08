@@ -1,13 +1,12 @@
 const express = require('express');
 
 const medicineRoutes = require('./medicineRoutes');
-
-router.use('/medications', medicineRoutes);
-
-
-
+const adminRoutes = require('./adminRoutes');
 
 const router = express.Router();
+
+router.use('/medications', medicineRoutes);
+router.use('/admin', adminRoutes);
 
 // Basic status endpoint
 router.get('/', (req, res) => {

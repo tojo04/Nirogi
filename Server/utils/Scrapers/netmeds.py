@@ -1,4 +1,5 @@
-import pandas as pd
+import json
+import sys
 import requests
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
@@ -71,12 +72,6 @@ def scrape_netmeds_product(link):
 
         browser.close()
 
-        print("✅ Extracted:")
-        print(f"Name: {name}")
-        print(f"Price: ₹{price}")
-        print(f"MRP: ₹{mrp}")
-        print(f"Discount: {discount}%")
-
         return {
             "pharmacy": "Netmeds",
             "name": name,
@@ -87,20 +82,11 @@ def scrape_netmeds_product(link):
         }
 
 if __name__ == "__main__":
-    query = "Cetcip 10mg"
+    query = " ".join(sys.argv[1:]) or "Cetcip 10mg"
     link = get_netmeds_link_from_serpapi(query)
     if link:
         data = scrape_netmeds_product(link)
-
-        try:
-            df_existing = pd.read_csv("best_netmeds_product.csv")
-        except FileNotFoundError:
-            df_existing = pd.DataFrame()
-
-        df_new = pd.DataFrame([data])
-        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-        df_combined.to_csv("best_netmeds_product.csv", index=False)
-
-        print("\n💾 Data saved to best_netmeds_product.csv")
+        print(json.dumps(data))
     else:
-        print("❌ Product not found.")
+        print(json.dumps({"error": "Product not found", "query": query}))
+        sys.exit(1)
