@@ -9,7 +9,6 @@ const MedicationsPage = () => {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClass, setFilterClass] = useState('all');
-  const [filterType, setFilterType] = useState('all');
 
   useEffect(() => {
     loadMedications();
@@ -28,17 +27,15 @@ const MedicationsPage = () => {
     }
   };
 
-  const filteredMedications = medications.filter(medication => {
-    const matchesSearch = medication.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         medication.genericName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         medication.brandName?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+  const filteredMedications = medications.filter((medication) => {
+    const query = searchQuery.toLowerCase();
+    const matchesSearch =
+      medication.name?.toLowerCase().includes(query) ||
+      medication.brand?.toLowerCase().includes(query);
+
     const matchesClass = filterClass === 'all' || medication.drugClass === filterClass;
-    const matchesType = filterType === 'all' || 
-                       (filterType === 'generic' && medication.isGeneric) ||
-                       (filterType === 'brand' && !medication.isGeneric);
-    
-    return matchesSearch && matchesClass && matchesType;
+
+    return matchesSearch && matchesClass;
   });
 
   const drugClasses = [...new Set(medications.map(med => med.drugClass))].sort();
@@ -82,7 +79,7 @@ const MedicationsPage = () => {
               <div>
                 <input
                   type="text"
-                  placeholder="Search medications by name, generic name, or brand name..."
+                  placeholder="Search medications by name or brand..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
@@ -101,17 +98,6 @@ const MedicationsPage = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="generic">Generic Only</option>
-                    <option value="brand">Brand Only</option>
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -126,29 +112,19 @@ const MedicationsPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredMedications.map((medication) => (
                 <div key={medication._id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">{medication.name}</h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      medication.isGeneric ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {medication.isGeneric ? 'Generic' : 'Brand'}
-                    </span>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{medication.name || 'Unknown'}</h3>
                   </div>
 
                   <div className="space-y-2 mb-4">
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium">Generic:</span> {medication.genericName}
-                    </p>
-                    {medication.brandName && (
-                      <p className="text-sm text-gray-600">
-                        <span className="font-medium">Brand:</span> {medication.brandName}
-                      </p>
-                    )}
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Dosage:</span> {medication.dosage.strength}{medication.dosage.unit} {medication.dosage.form}
+                      <span className="font-medium">Brand:</span> {medication.brand || 'N/A'}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium">Class:</span> {medication.drugClass}
+                      <span className="font-medium">Strength:</span> {`${medication.strength ?? ''} ${medication.unit ?? ''}`.trim() || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Class:</span> {medication.drugClass || 'N/A'}
                     </p>
                   </div>
 

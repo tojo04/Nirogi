@@ -153,19 +153,12 @@ const ComparePage = () => {
                   onClick={() => handleMedicationSelect(medication)}
                 >
                   <h3 className="text-lg font-semibold text-text mb-2">
-                    {medication.name}
+                    {medication.name || 'Unknown'}
                   </h3>
                   <p className="text-gray-600 mb-2">
-                    {(medication.genericName || medication.name || '').trim()} {medication.dosage?.strength ?? ''}{medication.dosage?.unit ?? ''}
+                    {medication.brand ? `${medication.brand} - ` : ''}{`${medication.strength ?? ''} ${medication.unit ?? ''}`.trim()}
                   </p>
                   <div className="flex items-center justify-between">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      medication.isGeneric 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {medication.isGeneric ? 'Generic' : 'Brand'}
-                    </span>
                     <span className="text-sm text-gray-500">
                       {medication.drugClass || ''}
                     </span>
